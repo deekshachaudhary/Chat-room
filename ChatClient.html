@@ -3,9 +3,13 @@
   <head>
     <title>Chat Application</title>
     <script src="/socket.io/socket.io.js"></script>
-    <style type="text/css">  	
+    <style type="text/css">
+			#usernamediv {
+				width : 100vw;
+				height : 2vh;
+			}
       #chat {
-        height : 100vh;
+        height : 96vh;
         width : 100vw;
 				padding: 1%;
       }
@@ -87,6 +91,12 @@
 				float: right;
 				margin-right: 20px;
 			}
+			#unbannedusersinroom {
+				border-style: ridge;
+			}
+			#tempbannedusersinroom {
+				border-style: ridge;
+			}
     </style>
 
     <script type="text/javascript">
@@ -106,51 +116,47 @@
         el.appendChild(document.createElement("hr"));
 				//display the username who sent this message
 				//always displayed in black and bold
-				el.appendChild (createCustomTextNode(data.name, 'black', data.bold, data.italics));
+				el.appendChild (createCustomTextNode(data.name, data.color, data.bold, data.italics));
 				el.appendChild (document.createTextNode (" : "));
 				//display the message sent by the user
 				//user can customize the color, bold and italics
 				el.appendChild (createCustomTextNode(data.message, data.color, data.bold, data.italics));
 				//reset the message text field
-				document.getElementById("message_input").value = "";
 				count++;
       });
 			
 			//recieve nickame already in use error message from server and
 			//display an alert to the user and prompt for new name
 			socketio.on("nickname_already_taken", function(data) {
-        alert(data.nickname + " already taken. Room not created");
+        alert(data.nickname + " already taken. Please enter some other name");
 				displayPrompt();
       });
 		
+			//Private message sent to current user
+			//Message is displayed in italics and red
 			socketio.on("msg_to_receiver", function(data) {
-				alert(data.message);
         var el = document.getElementById("messages");
 				el.appendChild(document.createElement("hr"));
-				
-				el.appendChild (createCustomTextNode(data.username, 'red', true, false));
-				el.appendChild (document.createTextNode (" : "));
-
+				el.appendChild (createCustomTextNode("Private message sent by " + data.sentBy, '#5D6D7E', false, true));
+				el.appendChild (document.createElement("br"));
+				el.appendChild (createCustomTextNode(data.sentBy, 'red', true, true));
+				el.appendChild (createCustomTextNode (" : ", 'red', true, true));
 				//display the message sent by the user
 				//user can customize the color, bold and italics
-				el.appendChild (createCustomTextNode(data.name, 'red', false, false));
-				//reset the message text field
-				document.getElementById("message_input").value = "";
+				el.appendChild (createCustomTextNode(data.message, 'red', false, true));
       });
 
+			//Private message sent by current user
 			socketio.on("msg_to_sender", function(data) {
-				alert(data.message);
         var el = document.getElementById("messages");
 				el.appendChild(document.createElement("hr"));
-				
-				el.appendChild (createCustomTextNode(data.username, 'red', true, false));
-				el.appendChild (document.createTextNode (" : "));
-
+				el.appendChild (createCustomTextNode("Private message sent to " + data.sentTo, '#5D6D7E', false, true));
+				el.appendChild (document.createElement("br"));
+				el.appendChild (createCustomTextNode(data.sentBy, 'red', true, true));
+				el.appendChild (createCustomTextNode (" : ", 'red', true, true));
 				//display the message sent by the user
 				//user can customize the color, bold and italics
-				el.appendChild (createCustomTextNode(data.name, 'red', false, false));
-				//reset the message text field
-				document.getElementById("message_input").value = "";
+				el.appendChild (createCustomTextNode(data.message, 'red', false, true));
       });
 			
 			//recieve roomname already in use error message from server and
@@ -171,41 +177,45 @@
         displayRoomNames(data.message);
       });
 	  
-	  function emptyUnbannedUsersDiv() {
+			//temporarily banned user is unbanned. Display
+			//a message that they can enter the room now.
+			socketio.on("can_enter_room_now", function(data) {
+        alert("You have been unbanned from room " + data.roomName);
+      });
+		
+			//Delete user elements from the screen
+			function emptyUnbannedUsersDiv() {
 				var myNode = document.getElementById("unbannedusersinroom");
 				while(myNode.firstChild) {
 					myNode.removeChild(myNode.firstChild);
 				}
-		}
+			}
 		
-		function emptyTempBannedUsersDiv() {
+			//Delete temporarily banned user elements from the screen
+			function emptyTempBannedUsersDiv() {
 				var myNode = document.getElementById("tempbannedusersinroom");
 				while(myNode.firstChild) {
 					myNode.removeChild(myNode.firstChild);
 				}
-		}
+			}
 		
-		function emptyMessagesDiv() {
+			//Delete all messages from the screen
+			function emptyMessagesDiv() {
 				var myNode = document.getElementById("messages");
 				while(myNode.firstChild) {
 					myNode.removeChild(myNode.firstChild);
 				}
-		}
+			}
 	  
 			//receive usernames in a room from server and
-			//display them to the user
+			//display them to the user. First remove the list that
+			//is on screen
 			socketio.on("usernames_to_client", function(data) {
-				
-				//var myNode = document.getElementById("unbannedusersinroom");
-				//while(myNode.firstChild) {
-				//	myNode.removeChild(myNode.firstChild);
-				//}
-
 					emptyUnbannedUsersDiv();
 					emptyTempBannedUsersDiv();
 					emptyMessagesDiv();
 			
-				//display user names(including temp banned list) on screen
+				//display user names on screen
         displayUserNames(data.message);
 				//display chatlog div to the user so that user can send messages
 				//to other users in the room and see their messages
@@ -215,8 +225,6 @@
       });
 			
 			//a user left the room, so remove the name from users list
-			//if name sent by server is equal to the nickname in this page,
-			//then the user is permanently banned from the room
 			socketio.on("user_left_room", function(data) {
         var el = document.getElementById(data.name);
 				el.parentNode.removeChild(el);
@@ -224,7 +232,7 @@
 			
 			//a new user joined the room, so add the name to users list
 			socketio.on("user_joined_room", function(data) {
-					displayUserNames(data.message);
+				displayUserNames(data.message);
       });
 			
 			//receive an error message from server and display it to the user
@@ -234,6 +242,9 @@
         alert(data.message);
       });
 			
+			//Current user is permanently banned from the room he is in.So
+			//delete users list on screen and messages from screen
+			//And then leave the room
 			socketio.on("user_perm_banned_from_room", function(data) {
 				emptyUnbannedUsersDiv();
 				emptyTempBannedUsersDiv();
@@ -241,9 +252,12 @@
 				document.getElementById("currentchatroom").value = "Enter a Chat Room";
 				document.getElementById("chatlog").style.display = "none";
 				document.getElementById("roomname").value = "";
-        alert("You have been permanently banned from " + document.getElementById("roomname").value);
+        alert(data.message);
       });
 			
+			//Current user is temporarily banned from the room he is in.So
+			//delete users list on screen and messages from screen
+			//And then leave the room
 			socketio.on("user_temp_banned_from_room", function(data) {
 				emptyUnbannedUsersDiv();
 				emptyTempBannedUsersDiv();
@@ -251,29 +265,42 @@
 				document.getElementById("currentchatroom").value = "Enter a Chat Room";
 				document.getElementById("chatlog").style.display = "none";
 				document.getElementById("roomname").value = "";
-        alert("You have been temmporarily banned from " + document.getElementById("roomname").value);
+        alert("You have been temmporarily banned from " + data.room);
       });
 		
-		socketio.on("temp_ban_user", function(data) {
+			//A user in the room is temporarily banned. So delete
+			//the user from users list. If current user is the creator of the room
+			//then display that user element in banned users list
+			socketio.on("temp_ban_user", function(data) {
+				var el = document.getElementById(data.name);
+				var isOwner = false;
+				//Only creator can ban a person, so
+				//that button is displayed only if the current user is
+				//the creator
+				if(document.getElementById("permBan"))
+					isOwner = true;
+				el.parentNode.removeChild(el);
+				
+				//If owner display the name in banned list
+				if(isOwner) {
+					var messageArray = [];
+					messageArray.push(document.getElementById("nickname").value);
+					var userArray = [];
+					userArray.push(data.name);
+					messageArray.push([]);
+					messageArray.push(userArray);
+					displayUserNames(messageArray);
+				}
+		  });
+   
+			//Current user(and also the creator) has unbanned a temp banned a user
+			//Remove the user from banned list
+			socketio.on("unban_a_user", function(data) {
 			
-			var el = document.getElementById(data.name);
-			var isOwner = false;
-			if(document.getElementById("permBan"))
-				isOwner = true;
-			el.parentNode.removeChild(el);
-			var messageArray = [];
-			if(isOwner)
-				messageArray.push(document.getElementById("nickname").value);
-			else
-				messageArray.push("g456b@#");
-			var userArray = [];
-			userArray.push(data.name);
-			messageArray.push([]);
-			messageArray.push(userArray);
-			displayUserNames(messageArray);
-      alert(data.name + " has been temmporarily banned from " + document.getElementById("roomname").value);
-      });
-
+				var el = document.getElementById(data.name);
+				el.parentNode.removeChild(el);
+		  });
+			
 			//validate user input. (nickname etc.)
 			//Can contain only alphanumeric, hyphen and underscore characters
 			function isValidInput(input) {
@@ -330,25 +357,37 @@
 				var nickname = document.getElementById("nickname").value;
         socketio.emit("message_to_server", {message:msg, name:nickname,
 											color:messageColor, bold: isBold, italics: isItalics});
+				document.getElementById("message_input").value = "";
       }
 			
 			//set message color to user selected color
 			function setMessageColor(event) {
 				var color = "black";
-				if(event.target.value === "Default Color(Black)")
+				if(event.target.value === "Default Color(Black)") {
 					color = "#000000";
-				if(event.target.value === "Blue")
+					alert("Your messages would appear in Black");
+				}
+				if(event.target.value === "Blue") {
 					color = "#062A78";
-				if(event.target.value === "Violet")
+					alert("Your messages would appear in Blue");
+				}
+				if(event.target.value === "Violet") {
 					color = "#B284BE";
-				if(event.target.value === "Maroon")
+					alert("Your messages would appear in Violet");
+				}
+				if(event.target.value === "Maroon") {
 					color = "#C32148";
-				if(event.target.value === "Yellow")
+					alert("Your messages would appear in Maroon");
+				}
+				if(event.target.value === "Yellow") {
 					color = "#FFF600";
-				if(event.target.value === "Green")
+					alert("Your messages would appear in Yellow");
+				}
+				if(event.target.value === "Green") {
 					color = "#008000";
+					alert("Your messages would appear in Green");
+				}
 				messageColor = color;
-				alert("Your messages would appear in "+color);
 			}
 
 			//set message style to user selected style (bold, not bold, italic, not italic)
@@ -455,10 +494,9 @@
 				}
 			}
 			
-			//create a room html element, add attributes and event listener.
-			//Append it to html element.
+			//create a room html element in the rooms list, add attributes
+			//and event listener. Append it to html element.
 			function appendRoomToList(roomInfo) {
-				
 				document.getElementById("noroommsg").style.display = "none";
 				var el = document.getElementById("roomnameslist");
 				item = document.createElement('input');
@@ -478,8 +516,8 @@
 				document.getElementById("noroommsg").style.display = "block";
 			}
 			
-			//User is trying to enter a room.If user is already
-			//in the room, then display that message to user and do nothing
+			//User is trying to enter a room. If user is already
+			//in the room, then alert the user and do nothing
 			//Otherwise, send server request with data containing roomname,
 			//username and pwd (if it is a private room)
 			function enterRoom(event) {
@@ -489,31 +527,34 @@
 					return;
 				}
 				var userName = document.getElementById("nickname").value;
-				document.getElementById("roomname").value = roomName;
 				if(event.target.id === "publicRoomItem") {
+					document.getElementById("roomname").value = roomName;
 					socketio.emit("enter_public_room", {message:roomName + "," +
 												userName});
 				} else {
 					
 					var privateRoomPassword = enterRoomPassword();
 					if(privateRoomPassword) {
+						document.getElementById("roomname").value = roomName;
 						socketio.emit("enter_private_room", {message:roomName + "," +
 							privateRoomPassword + "," + userName});
 					} 
 				}
 			}
 			
-			//display usernames on the screen -
-			//both the temporarily banned users and other users
+			//display users in a room on the screen -
+			//Display temp banned users list as well if
+			//current user is the creator of the room
 			function displayUserNames(usersDetails) {
 				var owner = isCreatorOfRoom(usersDetails[0]);
 				var userName = document.getElementById("nickname").value;
-				appendUnbannedUsersToList(owner, userName, usersDetails[1]);
-				appendTempBannedUsersToList(owner, userName, usersDetails[2]);
+				appendUnbannedUsersToList(owner, userName, usersDetails[1], usersDetails[0]);
+				if(owner)
+					appendTempBannedUsersToList(owner, userName, usersDetails[2], usersDetails[0]);
 			}
 			
 			//display unbanned users on the screen
-			function appendUnbannedUsersToList(isOwner, userName, usersInfo) {
+			function appendUnbannedUsersToList(isCurrentUserOwner, userName, usersInfo, ownerName) {
 				var el = document.getElementById("unbannedusersinroom");
 				for(var i = 0; i < usersInfo.length; i++) {
 					var userDiv = document.createElement('div');
@@ -522,7 +563,7 @@
 					userDiv.style.padding = "2%";
 					var textEl = document.createTextNode(usersInfo[i]);
 					//add buttons to the user item - like report, send private msg etc.
-					var buttonDiv = addButtonsToUser(isOwner, false, userName, usersInfo[i]);
+					var buttonDiv = addButtonsToUser(isCurrentUserOwner, false, userName, usersInfo[i], ownerName);
 					userDiv.appendChild(textEl);
 					userDiv.appendChild(buttonDiv);
 					el.appendChild(userDiv);
@@ -530,7 +571,7 @@
 			}
 			
 			//display temporarily banned users on the screen
-			function appendTempBannedUsersToList(isOwner, userName, usersInfo) {				
+			function appendTempBannedUsersToList(isCurrentUserOwner, userName, usersInfo, ownerName) {				
 				var el = document.getElementById("tempbannedusersinroom");
 				for(var i = 0; i < usersInfo.length; i++) {
 					var userDiv = document.createElement('div');
@@ -539,14 +580,14 @@
 					userDiv.style.border = "thin solid #d3d3d3";
 					userDiv.style.padding = "2%";
 					//add button to the user item - unban.
-					var buttonDiv = addButtonsToUser(isOwner, true, userName, usersInfo[i]);
+					var buttonDiv = addButtonsToUser(isCurrentUserOwner, true, userName, usersInfo[i], ownerName);
 					userDiv.appendChild(textEl);
 					userDiv.appendChild(buttonDiv);
 					el.appendChild(userDiv);
 				}
 			}
 			
-			//is the creator of the room is entering the room
+			//is the creator of the room entering the room
 			function isCreatorOfRoom(owner) {
 				var userName = document.getElementById("nickname").value;
 				if(owner === userName) {
@@ -560,30 +601,32 @@
 			//temp-ban and perm-ban buttons are displayed only if the creator
 			//of the room is the currentuser.
 			//Also unban is displayed to the creator if user is temp banned
-			//others can see report and send private msg buttons
-			function addButtonsToUser(isOwner, isTempBanned, currentUser, userName) {
-				
+			//others can see report (cannot report creator) and send private msg buttons
+			function addButtonsToUser(isCurrentUserOwner, isTempBanned, currentUser, userName, ownerName) {
 				var item = document.createElement('span');
 				item.style.padding = "2%";
+				item.style.float = "right";
 				if(currentUser !== userName) {
 					if(isTempBanned) {
 					
-						if(isOwner) {
+						if(isCurrentUserOwner) {
 							var unbanButton = createUnbanButton(userName);
 							item.appendChild(unbanButton);
 						}
 					} else {
 						var	privateMsgButton = createPrivateMsgButton(userName);
-						//Current user
-						if(isOwner) {
+						if(isCurrentUserOwner) {
 							var tempBanButton = createTempBanButton(userName);
 							var	permBanButton = createPermBanButton(userName);
 							item.appendChild(tempBanButton);
 							item.appendChild(permBanButton);
 							item.appendChild(privateMsgButton);
 						} else {
-							var	reportUserButton = createReportUserButton(userName);
-							item.appendChild(reportUserButton);
+							//cannot report the creator
+							if(ownerName !== userName) {
+								var	reportUserButton = createReportUserButton(userName);
+								item.appendChild(reportUserButton);
+							}
 							item.appendChild(privateMsgButton);
 						}
 					}
@@ -621,7 +664,7 @@
 				return item;
 			}
 			
-			//create a html button element for permamemtly banning a user
+			//create a html button element for permanently banning a user
 			//and set event listener
 			function createPermBanButton(currentUser) {
 				var item = createUserActionButtons(currentUser, "Perm Ban", "permBan");
@@ -653,7 +696,9 @@
 			
 			//callback function for unban event
 			function unbanUser(event) {
-				alert("send a message to server to unban user " + event.target.name);
+				var room = document.getElementById("roomname").value;
+				var userToUnban = event.target.name;
+				socketio.emit("unban_temp_user", {userName: userToUnban, roomName : room });
 			}
 			
 			//callback function for temp ban event
@@ -672,14 +717,18 @@
 			
 			//callback function for report user event
 			function reportUser(event) {
-				alert("send a message to server to reportUser a user " + event.target.name);
+				var roomName = document.getElementById("roomname").value;
+				var currentUser = document.getElementById("nickname").value;
+				var reportedUser = event.target.name;
+				socketio.emit("report_user", {room:roomName , user:reportedUser, reportedBy:currentUser});
+				alert("You reported " +  reportedUser + " in room " + roomName);
 			}
 			
 			//callback function for send private msg event
 			function sendPrivateMsg(event) {
 				var sender = document.getElementById("nickname").value;
 				var receiver = event.target.name;
-				var msg = prompt("Enter private message to send to " +receiver);
+				var msg = prompt("Enter private message to send to " + receiver);
 				socketio.emit("send_private_msg", { message: sender+ "," +receiver+ "," +msg });
 			}
 			
@@ -729,7 +778,9 @@
 			</script>
 	</head>
 	<body id = "appbody">
-		<h2 id="curruser">User not logged in</h2>
+		<div id = "usernamediv">
+			<h3 id="curruser">User not logged in</h3>
+		</div>
 		<div id = "chat"  class = "chat" hidden>
 			<div id = "roomnames">
 				<h3 id = roomnameslabel>Room Names</h3>
@@ -754,37 +805,36 @@
 				
 				<div id = "customizemessage">
 					<h4>Customize your messages here:</h4>
-					<input type = "submit" id = "color_black" value= "Default Color(Black)"/>					
-					<input type = "submit" id = "color_blue" value= "Blue"/>
-					<input type = "submit" id = "color_violet" value= "Violet"/>
-					<input type = "submit" id = "color_maroon" value= "Maroon"/>
-					<input type = "submit" id = "color_yellow" value= "Yellow"/>
-					<input type = "submit" id = "color_green" value= "Green"/>
+					<input type = "submit" id = "color_black" value = "Default Color(Black)"/>					
+					<input type = "submit" id = "color_blue" value = "Blue"/>
+					<input type = "submit" id = "color_violet" value = "Violet"/>
+					<input type = "submit" id = "color_maroon" value = "Maroon"/>
+					<input type = "submit" id = "color_yellow" value = "Yellow"/>
+					<input type = "submit" id = "color_green" value = "Green"/>
 					
 					<hr>
 					
-					<input type = "submit" id = "text_bold" value= "Bold"/>
-					<input type = "submit" id = "text_not_bold" value= "Not Bold"/>
+					<input type = "submit" id = "text_bold" value = "Bold"/>
+					<input type = "submit" id = "text_not_bold" value = "Not Bold"/>
 					
 					<hr>
 					
-					<input type = "submit" id = "text_italics" value= "Italics"/>
-					<input type = "submit" id = "text_not_italics" value= "Not Italics"/>					
+					<input type = "submit" id = "text_italics" value = "Italics"/>
+					<input type = "submit" id = "text_not_italics" value = "Not Italics"/>					
 				</div>
-
 			</div>
 			
 			<div id = "chatroom">
 				<h3 id = chatroomlabel>Chat Log</h3>
-				<input type="text" id="currentchatroom" name="currentchatroom" value = "Enter a Chat Room" readonly>
+				<input type = "text" id = "currentchatroom" name = "currentchatroom" value = "Enter a Chat Room" readonly>
 				<div id = "chatlog">
-          <div id="messages"></div>
-						<input type="text" id="message_input"/>
-						<button onclick="sendMessage();" id = "sendMessage">send</button>
+          <input type = "text" id = "message_input"/>
+					<button onclick = "sendMessage();" id = "sendMessage">send</button>
+					<div id = "messages"></div>
 				</div>
       </div>
-			<input type="hidden" name = "nickname" id = "nickname" value = "">
-			<input type="hidden" name = "roomname" id = "roomname" value = "">
+			<input type = "hidden" name = "nickname" id = "nickname" value = "">
+			<input type = "hidden" name = "roomname" id = "roomname" value = "">
 		</div>
   </body>
 </html>
